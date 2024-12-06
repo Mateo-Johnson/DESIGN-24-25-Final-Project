@@ -1,9 +1,11 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <Servo.h>
+#include <Adafruit_NeoPixel.h>
 
 MPU6050 mpu;
 Servo servoX, servoY;
+Adafruit_NeoPixel led(1, 6, NEO_GRB + NEO_KHZ800); 
 
 float Kp = 2.0, Ki = 0.5, Kd = 1.0;
 float integralPitch = 0, integralRoll = 0;
@@ -32,10 +34,8 @@ float P[2][2] = {{1, 0}, {0, 1}};
 unsigned long lastBlinkTime = 0;
 bool blinkState = false;
 
-// Pin definitions for RGB LED
-const int redPin = 5;
-const int greenPin = 6;
-const int bluePin = 9;
+bool userSetTarget = false; 
+
 
 void setup() {
   Wire.begin();
@@ -48,11 +48,8 @@ void setup() {
 
   servoX.attach(9);
   servoY.attach(10);
-
-  // Set RGB LED pins as OUTPUT
-  pinMode(redPin, OUTPUT);
-  pinMode(greenPin, OUTPUT);
-  pinMode(bluePin, OUTPUT);
+  led.begin();
+  led.show();
 
   runPreFlightCheck();
   runHomingSequence();
@@ -80,7 +77,20 @@ void loop() {
       Serial.print("New Kp: "); Serial.println(Kp);
       Serial.print("New Ki: "); Serial.println(Ki);
       Serial.print("New Kd: "); Serial.println(Kd);
+    } else if (command == 'T') {
+      Serial.println("Enter Target Pitch and Roll values (degrees): ");
+      while (Serial.available() == 0) {}
+      targetPitch = Serial.parseFloat();
+      targetRoll = Serial.parseFloat();
+      userSetTarget = true;
+      Serial.print("New Target Pitch: "); Serial.println(targetPitch);
+      Serial.print("New Target Roll: "); Serial.println(targetRoll);
     }
+  }
+
+  if (!userSetTarget) {
+    targetPitch = 0;
+    targetRoll = 0;
   }
 
   if (currentMode == STABILIZE && (abs(errorPitch) > recoveryThreshold || abs(errorRoll) > recoveryThreshold)) {
@@ -164,6 +174,8 @@ bool calibrateGyro() {
 
 float computePID(float error, float deltaTime, float *integral, float *prevError) {
   *integral += error * deltaTime;
+  *integral = constrain(*integral, -1000, 1000); 
+
   float derivative = (error - *prevError) / deltaTime;
   float output = Kp * error + Ki * *integral + Kd * derivative;
   *prevError = error;
@@ -246,9 +258,8 @@ void updateRGBLED(float pitchError, float rollError) {
     green = 255;
   }
 
-  analogWrite(redPin, red);
-  analogWrite(greenPin, green);
-  analogWrite(bluePin, blue);
+  led.setPixelColor(0, led.Color(red, green, blue));
+  led.show();
 }
 
 void setErrorLED(int errorCode) {
@@ -261,35 +272,25 @@ void setErrorLED(int errorCode) {
     if (blinkState) {
       switch (errorCode) {
         case 1:
-          analogWrite(redPin, 255); 
-          analogWrite(greenPin, 0); 
-          analogWrite(bluePin, 0); 
+          led.setPixelColor(0, led.Color(255, 0, 0)); 
           break;
         case 2:
-          analogWrite(redPin, 255); 
-          analogWrite(greenPin, 165); 
-          analogWrite(bluePin, 0); 
+          led.setPixelColor(0, led.Color(255, 165, 0)); 
           break;
         case 3:
-          analogWrite(redPin, 255); 
-          analogWrite(greenPin, 165); 
-          analogWrite(bluePin, 0); 
+          led.setPixelColor(0, led.Color(255, 165, 0)); 
           break;
         case 4:
-          analogWrite(redPin, 255); 
-          analogWrite(greenPin, 0); 
-          analogWrite(bluePin, 255); 
+          led.setPixelColor(0, led.Color(255, 0, 255)); 
           break;
         default:
-          analogWrite(redPin, 0); 
-          analogWrite(greenPin, 0); 
-          analogWrite(bluePin, 255); 
+          led.setPixelColor(0, led.Color(0, 0, 255));
           break;
       }
     } else {
-      analogWrite(redPin, 0); 
-      analogWrite(greenPin, 0); 
-      analogWrite(bluePin, 0); 
+      led.setPixelColor(0, led.Color(0, 0, 0)); 
     }
   }
+  
+  led.show();
 }
