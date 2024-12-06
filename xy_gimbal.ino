@@ -1,11 +1,9 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <Servo.h>
-#include <Adafruit_NeoPixel.h>
 
 MPU6050 mpu;
 Servo servoX, servoY;
-Adafruit_NeoPixel led(1, 6, NEO_GRB + NEO_KHZ800); 
 
 float Kp = 2.0, Ki = 0.5, Kd = 1.0;
 float integralPitch = 0, integralRoll = 0;
@@ -34,6 +32,11 @@ float P[2][2] = {{1, 0}, {0, 1}};
 unsigned long lastBlinkTime = 0;
 bool blinkState = false;
 
+// Pin definitions for RGB LED
+const int redPin = 5;
+const int greenPin = 6;
+const int bluePin = 9;
+
 void setup() {
   Wire.begin();
   Serial.begin(9600);
@@ -45,8 +48,11 @@ void setup() {
 
   servoX.attach(9);
   servoY.attach(10);
-  led.begin();
-  led.show();
+
+  // Set RGB LED pins as OUTPUT
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
 
   runPreFlightCheck();
   runHomingSequence();
@@ -240,8 +246,9 @@ void updateRGBLED(float pitchError, float rollError) {
     green = 255;
   }
 
-  led.setPixelColor(0, led.Color(red, green, blue));
-  led.show();
+  analogWrite(redPin, red);
+  analogWrite(greenPin, green);
+  analogWrite(bluePin, blue);
 }
 
 void setErrorLED(int errorCode) {
@@ -254,25 +261,35 @@ void setErrorLED(int errorCode) {
     if (blinkState) {
       switch (errorCode) {
         case 1:
-          led.setPixelColor(0, led.Color(255, 0, 0)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 0); 
+          analogWrite(bluePin, 0); 
           break;
         case 2:
-          led.setPixelColor(0, led.Color(255, 165, 0)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 165); 
+          analogWrite(bluePin, 0); 
           break;
         case 3:
-          led.setPixelColor(0, led.Color(255, 165, 0)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 165); 
+          analogWrite(bluePin, 0); 
           break;
         case 4:
-          led.setPixelColor(0, led.Color(255, 0, 255)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 0); 
+          analogWrite(bluePin, 255); 
           break;
         default:
-          led.setPixelColor(0, led.Color(0, 0, 255));
+          analogWrite(redPin, 0); 
+          analogWrite(greenPin, 0); 
+          analogWrite(bluePin, 255); 
           break;
       }
     } else {
-      led.setPixelColor(0, led.Color(0, 0, 0)); 
+      analogWrite(redPin, 0); 
+      analogWrite(greenPin, 0); 
+      analogWrite(bluePin, 0); 
     }
   }
-  
-  led.show();
 }
