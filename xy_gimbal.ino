@@ -31,6 +31,9 @@ float Q_angle = 0.001, Q_bias = 0.003, R_measure = 0.03;
 float anglePitch = 0, angleRoll = 0, biasPitch = 0, biasRoll = 0;
 float P[2][2] = {{1, 0}, {0, 1}};
 
+unsigned long lastBlinkTime = 0;
+bool blinkState = false;
+
 void setup() {
   Wire.begin();
   Serial.begin(9600);
@@ -242,22 +245,34 @@ void updateRGBLED(float pitchError, float rollError) {
 }
 
 void setErrorLED(int errorCode) {
-  switch (errorCode) {
-    case 1:
-      led.setPixelColor(0, led.Color(255, 0, 0));
-      break;
-    case 2:
-      led.setPixelColor(0, led.Color(255, 165, 0));
-      break;
-    case 3:
-      led.setPixelColor(0, led.Color(255, 165, 0));
-      break;
-    case 4:
-      led.setPixelColor(0, led.Color(255, 0, 255));
-      break;
-    default:
-      led.setPixelColor(0, led.Color(0, 0, 255));
-      break;
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - lastBlinkTime > 500) {
+    lastBlinkTime = currentMillis;
+    blinkState = !blinkState;
+
+    if (blinkState) {
+      switch (errorCode) {
+        case 1:
+          led.setPixelColor(0, led.Color(255, 0, 0)); 
+          break;
+        case 2:
+          led.setPixelColor(0, led.Color(255, 165, 0)); 
+          break;
+        case 3:
+          led.setPixelColor(0, led.Color(255, 165, 0)); 
+          break;
+        case 4:
+          led.setPixelColor(0, led.Color(255, 0, 255)); 
+          break;
+        default:
+          led.setPixelColor(0, led.Color(0, 0, 255));
+          break;
+      }
+    } else {
+      led.setPixelColor(0, led.Color(0, 0, 0)); 
+    }
   }
+  
   led.show();
 }
