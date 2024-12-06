@@ -27,11 +27,18 @@ float gyroXHistory[filterSize] = {0};
 float gyroYHistory[filterSize] = {0};
 int filterIndex = 0;
 
+float Q_angle = 0.001, Q_bias = 0.003, R_measure = 0.03;
+float anglePitch = 0, angleRoll = 0, biasPitch = 0, biasRoll = 0;
+float P[2][2] = {{1, 0}, {0, 1}};
+
 void setup() {
   Wire.begin();
   Serial.begin(9600);
   mpu.initialize();
-  if (!mpu.testConnection()) while (1);
+  if (!mpu.testConnection()) {
+    setErrorLED(1); 
+    while (1);
+  }
 
   servoX.attach(9);
   servoY.attach(10);
@@ -52,6 +59,20 @@ void loop() {
 
   unsigned long currentTime = millis();
   float deltaTime = (currentTime - prevTime) / 1000.0;
+
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    if (command == 'K') {
+      Serial.println("Enter Kp, Ki, Kd values: ");
+      while (Serial.available() == 0) {}
+      Kp = Serial.parseFloat();
+      Ki = Serial.parseFloat();
+      Kd = Serial.parseFloat();
+      Serial.print("New Kp: "); Serial.println(Kp);
+      Serial.print("New Ki: "); Serial.println(Ki);
+      Serial.print("New Kd: "); Serial.println(Kd);
+    }
+  }
 
   if (currentMode == STABILIZE && (abs(errorPitch) > recoveryThreshold || abs(errorRoll) > recoveryThreshold)) {
     switchMode(RECOVERY);
@@ -81,12 +102,12 @@ void runPreFlightCheck() {
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
   
   if (ax == 0 && ay == 0 && az == 0) {
-    Serial.println("Accelerometer Test Failed");
+    setErrorLED(2); 
     while (1);
   }
 
   if (gx == 0 && gy == 0 && gz == 0) {
-    Serial.println("Gyroscope Test Failed");
+    setErrorLED(3); 
     while (1);
   }
 
@@ -106,10 +127,13 @@ void runHomingSequence() {
   delay(500);
   servoY.write(90);
 
-  calibrateGyro();
+  if (!calibrateGyro()) {
+    setErrorLED(4); 
+    while (1);
+  }
 }
 
-void calibrateGyro() {
+bool calibrateGyro() {
   long sumX = 0, sumY = 0, sumZ = 0;
   const int samples = 100;
 
@@ -125,6 +149,8 @@ void calibrateGyro() {
   gyroXOffset = sumX / samples;
   gyroYOffset = sumY / samples;
   gyroZOffset = sumZ / samples;
+
+  return true;
 }
 
 float computePID(float error, float deltaTime, float *integral, float *prevError) {
@@ -152,17 +178,37 @@ void getFilteredOrientation(float* pitch, float* roll) {
   float accelPitch = atan2(accelY, sqrt(accelX * accelX + accelZ * accelZ)) * 180 / PI;
   float accelRoll = atan2(-accelX, accelZ) * 180 / PI;
 
-  static float gyroPitch = 0;
-  static float gyroRoll = 0;
+  kalmanFilter(accelPitch, gyroX, &anglePitch, &biasPitch);
+  kalmanFilter(accelRoll, gyroY, &angleRoll, &biasRoll);
 
+  *pitch = anglePitch;
+  *roll = angleRoll;
+}
+
+void kalmanFilter(float accelAngle, float gyroRate, float* angle, float* bias) {
   float dt = (millis() - prevTime) / 1000.0;
 
-  gyroPitch += gyroX * dt;
-  gyroRoll += gyroY * dt;
+  P[0][0] += dt * (dt * P[1][1] - P[0][1] - P[1][0] + Q_angle);
+  P[0][1] -= dt * P[1][1];
+  P[1][0] -= dt * P[1][1];
+  P[1][1] += Q_bias * dt;
 
-  const float alpha = 0.98;
-  *pitch = alpha * gyroPitch + (1 - alpha) * accelPitch;
-  *roll = alpha * gyroRoll + (1 - alpha) * accelRoll;
+  float y = accelAngle - *angle;
+  float S = P[0][0] + R_measure;
+  float K[2];
+  K[0] = P[0][0] / S;
+  K[1] = P[1][0] / S;
+
+  *angle += K[0] * y;
+  *bias += K[1] * y;
+
+  float P00_temp = P[0][0];
+  float P01_temp = P[0][1];
+
+  P[0][0] -= K[0] * P00_temp;
+  P[0][1] -= K[0] * P01_temp;
+  P[1][0] -= K[1] * P00_temp;
+  P[1][1] -= K[1] * P01_temp;
 }
 
 float getFilteredValue(float* history, int size) {
@@ -192,5 +238,26 @@ void updateRGBLED(float pitchError, float rollError) {
   }
 
   led.setPixelColor(0, led.Color(red, green, blue));
+  led.show();
+}
+
+void setErrorLED(int errorCode) {
+  switch (errorCode) {
+    case 1:
+      led.setPixelColor(0, led.Color(255, 0, 0));
+      break;
+    case 2:
+      led.setPixelColor(0, led.Color(255, 165, 0));
+      break;
+    case 3:
+      led.setPixelColor(0, led.Color(255, 165, 0));
+      break;
+    case 4:
+      led.setPixelColor(0, led.Color(255, 0, 255));
+      break;
+    default:
+      led.setPixelColor(0, led.Color(0, 0, 255));
+      break;
+  }
   led.show();
 }
