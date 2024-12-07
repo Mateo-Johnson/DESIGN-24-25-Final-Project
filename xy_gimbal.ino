@@ -1,11 +1,9 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <Servo.h>
-#include <Adafruit_NeoPixel.h>
 
 MPU6050 mpu;
 Servo servoX, servoY;
-Adafruit_NeoPixel led(1, 6, NEO_GRB + NEO_KHZ800); 
 
 float Kp = 2.0, Ki = 0.5, Kd = 1.0;
 float integralPitch = 0, integralRoll = 0;
@@ -36,6 +34,12 @@ bool blinkState = false;
 
 bool userSetTarget = false; 
 
+int redPin = 5;
+int greenPin = 6;
+int bluePin = 7;
+int currentRed = 0, currentGreen = 255, currentBlue = 0;
+int targetRed = 0, targetGreen = 255, targetBlue = 0;
+float transitionSpeed = 0.05;
 
 void setup() {
   Wire.begin();
@@ -48,8 +52,10 @@ void setup() {
 
   servoX.attach(9);
   servoY.attach(10);
-  led.begin();
-  led.show();
+
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
 
   runPreFlightCheck();
   runHomingSequence();
@@ -174,7 +180,7 @@ bool calibrateGyro() {
 
 float computePID(float error, float deltaTime, float *integral, float *prevError) {
   *integral += error * deltaTime;
-  *integral = constrain(*integral, -1000, 1000); 
+  *integral = constrain(*integral, -1000, 1000);  
 
   float derivative = (error - *prevError) / deltaTime;
   float output = Kp * error + Ki * *integral + Kd * derivative;
@@ -183,7 +189,7 @@ float computePID(float error, float deltaTime, float *integral, float *prevError
 }
 
 void getFilteredOrientation(float* pitch, float* roll) {
-  float accelX, accelY, accelZ, gyroX, gyroY, gyroZ;
+  int16_t accelX, accelY, accelZ, gyroX, gyroY, gyroZ;
   mpu.getMotion6(&accelX, &accelY, &accelZ, &gyroX, &gyroY, &gyroZ);
 
   gyroX = (gyroX - gyroXOffset) / 131.0;
@@ -205,6 +211,7 @@ void getFilteredOrientation(float* pitch, float* roll) {
   *pitch = anglePitch;
   *roll = angleRoll;
 }
+
 
 void kalmanFilter(float accelAngle, float gyroRate, float* angle, float* bias) {
   float dt = (millis() - prevTime) / 1000.0;
@@ -246,25 +253,43 @@ void switchMode(ControlMode mode) {
 
 void updateRGBLED(float pitchError, float rollError) {
   float error = max(pitchError, rollError);
-  int red = 0, green = 255, blue = 0;
 
-  if (error > 20) {
-    red = 255;
-    green = 0;
-  } else if (error > 10) {
-    red = 255;
-    green = 255;
+  if (error > 20) { 
+    targetRed = 255;
+    targetGreen = 0;
+    targetBlue = 0;
+  } else if (error > 10) { 
+    targetRed = 255;
+    targetGreen = map(error, 10, 20, 0, 255); 
+    targetBlue = 0;
   } else if (error > 5) {
-    green = 255;
+    targetRed = 0;
+    targetGreen = map(error, 5, 10, 255, 255); 
+    targetBlue = 0;
+  } else {
+    targetRed = 0;
+    targetGreen = 255;
+    targetBlue = 0;
   }
 
-  led.setPixelColor(0, led.Color(red, green, blue));
-  led.show();
+  currentRed = lerp(currentRed, targetRed, transitionSpeed);
+  currentGreen = lerp(currentGreen, targetGreen, transitionSpeed);
+  currentBlue = lerp(currentBlue, targetBlue, transitionSpeed);
+
+  analogWrite(redPin, currentRed);
+  analogWrite(greenPin, currentGreen);
+  analogWrite(bluePin, currentBlue);
 }
+
+int lerp(int start, int end, float t) {
+  return start + (end - start) * t;
+}
+
+
 
 void setErrorLED(int errorCode) {
   unsigned long currentMillis = millis();
-  
+
   if (currentMillis - lastBlinkTime > 500) {
     lastBlinkTime = currentMillis;
     blinkState = !blinkState;
@@ -272,25 +297,35 @@ void setErrorLED(int errorCode) {
     if (blinkState) {
       switch (errorCode) {
         case 1:
-          led.setPixelColor(0, led.Color(255, 0, 0)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 0); 
+          analogWrite(bluePin, 0); 
           break;
         case 2:
-          led.setPixelColor(0, led.Color(255, 165, 0)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 165); 
+          analogWrite(bluePin, 0); 
           break;
         case 3:
-          led.setPixelColor(0, led.Color(255, 165, 0)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 165); 
+          analogWrite(bluePin, 0); 
           break;
         case 4:
-          led.setPixelColor(0, led.Color(255, 0, 255)); 
+          analogWrite(redPin, 255); 
+          analogWrite(greenPin, 0); 
+          analogWrite(bluePin, 255); 
           break;
         default:
-          led.setPixelColor(0, led.Color(0, 0, 255));
+          analogWrite(redPin, 0); 
+          analogWrite(greenPin, 0); 
+          analogWrite(bluePin, 255); 
           break;
       }
     } else {
-      led.setPixelColor(0, led.Color(0, 0, 0)); 
+      analogWrite(redPin, 0); 
+      analogWrite(greenPin, 0); 
+      analogWrite(bluePin, 0); 
     }
   }
-  
-  led.show();
 }
