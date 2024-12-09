@@ -29,10 +29,7 @@ float Q_angle = 0.001, Q_bias = 0.003, R_measure = 0.03;
 float anglePitch = 0, angleRoll = 0, biasPitch = 0, biasRoll = 0;
 float P[2][2] = {{1, 0}, {0, 1}};
 
-unsigned long lastBlinkTime = 0;
-bool blinkState = false;
-
-bool userSetTarget = false; 
+bool userSetpoint = false; 
 
 int redPin = 5;
 int greenPin = 6;
@@ -40,6 +37,8 @@ int bluePin = 7;
 int currentRed = 0, currentGreen = 255, currentBlue = 0;
 int targetRed = 0, targetGreen = 255, targetBlue = 0;
 float transitionSpeed = 0.05;
+unsigned long lastBlinkTime = 0;
+bool blinkState = false;
 
 void setup() {
   Wire.begin();
@@ -57,8 +56,8 @@ void setup() {
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT);
 
-  runPreFlightCheck();
-  runHomingSequence();
+  runChecks();
+  homeAxes();
   prevTime = millis();
 }
 
@@ -88,13 +87,13 @@ void loop() {
       while (Serial.available() == 0) {}
       targetPitch = Serial.parseFloat();
       targetRoll = Serial.parseFloat();
-      userSetTarget = true;
+      userSetpoint = true;
       Serial.print("New Target Pitch: "); Serial.println(targetPitch);
       Serial.print("New Target Roll: "); Serial.println(targetRoll);
     }
   }
 
-  if (!userSetTarget) {
+  if (!userSetpoint) {
     targetPitch = 0;
     targetRoll = 0;
   }
@@ -120,8 +119,8 @@ void loop() {
   delay(10);
 }
 
-void runPreFlightCheck() {
-  Serial.println("Running Pre-flight Check...");
+void runChecks() {
+  Serial.println("Running Pre-flight Check");
 
   int16_t ax, ay, az, gx, gy, gz;
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
@@ -139,7 +138,7 @@ void runPreFlightCheck() {
   Serial.println("Pre-flight check passed!");
 }
 
-void runHomingSequence() {
+void homeAxes() {
   servoX.write(0);
   delay(500);
   servoX.write(180);
@@ -272,16 +271,16 @@ void updateRGBLED(float pitchError, float rollError) {
     targetBlue = 0;
   }
 
-  currentRed = lerp(currentRed, targetRed, transitionSpeed);
-  currentGreen = lerp(currentGreen, targetGreen, transitionSpeed);
-  currentBlue = lerp(currentBlue, targetBlue, transitionSpeed);
+  currentRed = LERP(currentRed, targetRed, transitionSpeed);
+  currentGreen = LERP(currentGreen, targetGreen, transitionSpeed);
+  currentBlue = LERP(currentBlue, targetBlue, transitionSpeed);
 
   analogWrite(redPin, currentRed);
   analogWrite(greenPin, currentGreen);
   analogWrite(bluePin, currentBlue);
 }
 
-int lerp(int start, int end, float t) {
+int LERP(int start, int end, float t) {
   return start + (end - start) * t;
 }
 
