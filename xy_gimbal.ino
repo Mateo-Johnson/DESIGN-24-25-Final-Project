@@ -2,9 +2,11 @@
 #include <MPU6050.h>
 #include <Servo.h>
 
+//Servo & Gyro Initialization 
 MPU6050 mpu;
 Servo servoX, servoY;
 
+//Variable Declarations
 float Kp = 2.0, Ki = 0.5, Kd = 1.0;
 float integralPitch = 0, integralRoll = 0;
 float prevErrorPitch = 0, prevErrorRoll = 0;
@@ -63,7 +65,7 @@ void setup() {
 
 void loop() {
   float pitch, roll;
-  getFilteredOrientation(&pitch, &roll);
+  filterOrientation(&pitch, &roll);
 
   float errorPitch = targetPitch - pitch;
   float errorRoll = targetRoll - roll;
@@ -113,7 +115,7 @@ void loop() {
   servoX.write(servoXPos);
   servoY.write(servoYPos);
 
-  updateRGBLED(abs(errorPitch), abs(errorRoll));
+  updateLED(abs(errorPitch), abs(errorRoll));
 
   prevTime = currentTime;
   delay(10);
@@ -187,7 +189,7 @@ float computePID(float error, float deltaTime, float *integral, float *prevError
   return output;
 }
 
-void getFilteredOrientation(float* pitch, float* roll) {
+void filterOrientation(float* pitch, float* roll) {
   int16_t accelX, accelY, accelZ, gyroX, gyroY, gyroZ;
   mpu.getMotion6(&accelX, &accelY, &accelZ, &gyroX, &gyroY, &gyroZ);
 
@@ -210,7 +212,6 @@ void getFilteredOrientation(float* pitch, float* roll) {
   *pitch = anglePitch;
   *roll = angleRoll;
 }
-
 
 void kalmanFilter(float accelAngle, float gyroRate, float* angle, float* bias) {
   float dt = (millis() - prevTime) / 1000.0;
@@ -250,7 +251,7 @@ void switchMode(ControlMode mode) {
   currentMode = mode;
 }
 
-void updateRGBLED(float pitchError, float rollError) {
+void updateLED(float pitchError, float rollError) {
   float error = max(pitchError, rollError);
 
   if (error > 20) { 
@@ -283,8 +284,6 @@ void updateRGBLED(float pitchError, float rollError) {
 int LERP(int start, int end, float t) {
   return start + (end - start) * t;
 }
-
-
 
 void setErrorLED(int errorCode) {
   unsigned long currentMillis = millis();
