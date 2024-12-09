@@ -45,7 +45,7 @@ void setup() {
   Serial.begin(9600);
   mpu.initialize();
   if (!mpu.testConnection()) {
-    setErrorLED(1); 
+    errorLED(1); 
     while (1);
   }
 
@@ -126,12 +126,12 @@ void runChecks() {
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
   
   if (ax == 0 && ay == 0 && az == 0) {
-    setErrorLED(2); 
+    errorLED(2); 
     while (1);
   }
 
   if (gx == 0 && gy == 0 && gz == 0) {
-    setErrorLED(3); 
+    errorLED(3); 
     while (1);
   }
 
@@ -152,7 +152,7 @@ void homeAxes() {
   servoY.write(90);
 
   if (!calibrateGyro()) {
-    setErrorLED(4); 
+    errorLED(4); 
     while (1);
   }
 }
@@ -283,7 +283,7 @@ int LERP(int start, int end, float t) {
   return start + (end - start) * t;
 }
 
-void setErrorLED(int errorCode) {
+void errorLED(int errorCode) {
   unsigned long currentMillis = millis();
 
   if (currentMillis - lastBlinkTime > 500) {
