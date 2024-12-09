@@ -2,11 +2,9 @@
 #include <MPU6050.h>
 #include <Servo.h>
 
-//Servo & Gyro Initialization 
 MPU6050 mpu;
 Servo servoX, servoY;
 
-//Variable Declarations
 float Kp = 2.0, Ki = 0.5, Kd = 1.0;
 float integralPitch = 0, integralRoll = 0;
 float prevErrorPitch = 0, prevErrorRoll = 0;
