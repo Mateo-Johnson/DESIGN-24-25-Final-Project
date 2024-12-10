@@ -40,6 +40,8 @@ float transitionSpeed = 0.05;
 unsigned long lastBlinkTime = 0;
 bool blinkState = false;
 
+bool emergencyStop = false;
+
 void setup() {
   Wire.begin();
   Serial.begin(9600);
@@ -62,17 +64,9 @@ void setup() {
 }
 
 void loop() {
-  float pitch, roll;
-  filterOrientation(&pitch, &roll);
-
-  float errorPitch = targetPitch - pitch;
-  float errorRoll = targetRoll - roll;
-
-  unsigned long currentTime = millis();
-  float deltaTime = (currentTime - prevTime) / 1000.0;
-
   if (Serial.available() > 0) {
     char command = Serial.read();
+
     if (command == 'K') {
       Serial.println("Enter Kp, Ki, Kd values: ");
       while (Serial.available() == 0) {}
@@ -82,7 +76,8 @@ void loop() {
       Serial.print("New Kp: "); Serial.println(Kp);
       Serial.print("New Ki: "); Serial.println(Ki);
       Serial.print("New Kd: "); Serial.println(Kd);
-    } else if (command == 'T') {
+    }
+    else if (command == 'T') {
       Serial.println("Enter Target Pitch and Roll values (degrees): ");
       while (Serial.available() == 0) {}
       targetPitch = Serial.parseFloat();
@@ -91,7 +86,31 @@ void loop() {
       Serial.print("New Target Pitch: "); Serial.println(targetPitch);
       Serial.print("New Target Roll: "); Serial.println(targetRoll);
     }
+    else if (command == 'E') {
+      emergencyStop = true;
+      servoX.write(90);
+      servoY.write(90);
+      Serial.println("Emergency Stopped");
+    }
+    else if (command == 'R') {
+      emergencyStop = false;
+      Serial.println("Resuming normal operation.");
+    }
   }
+
+  if (emergencyStop) {
+    delay(10);
+    return;
+  }
+
+  float pitch, roll;
+  filterOrientation(&pitch, &roll);
+
+  float errorPitch = targetPitch - pitch;
+  float errorRoll = targetRoll - roll;
+
+  unsigned long currentTime = millis();
+  float deltaTime = (currentTime - prevTime) / 1000.0;
 
   if (!userSetpoint) {
     targetPitch = 0;
@@ -118,6 +137,7 @@ void loop() {
   prevTime = currentTime;
   delay(10);
 }
+
 
 void runChecks() {
   Serial.println("Running Pre-flight Check");
