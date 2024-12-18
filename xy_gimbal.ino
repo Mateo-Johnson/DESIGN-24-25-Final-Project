@@ -106,8 +106,8 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
 
-  yawServo.attach(9);  
-  rollServo.attach(10);  
+  yawServo.attach(10);  
+  rollServo.attach(3);  
 
   yawServo.write(90);  
   rollServo.write(90); 
